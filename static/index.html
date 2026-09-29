@@ -1,0 +1,710 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FilletKnifeVPA</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #f6f7f9; --surface: #ffffff; --line: #e3e6eb; --line-strong: #cfd4dc;
+  --text: #1c2129; --muted: #667085; --accent: #2457d6; --accent-text: #ffffff;
+  --auto: #3d8b5f; --pinned: #b7791f; --paused: #2b6cb0; --bad: #c53030; --expired: #8a94a3;
+  --bar-usage: #4a9d76; --bar-manifest: #9aa4b2; --bar-vpa: #4c7be0; --bar-calc: #8f7be0; --bar-pinned: #d69329; --bar-live: #7a8797;
+  --warn-bg: #fff6e0; --warn-line: #ecd08a; --bad-bg: #fdecec; --bad-line: #f0b4b4;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14171c; --surface: #1b1f26; --line: #2b313b; --line-strong: #3a424f;
+    --text: #e6e9ee; --muted: #93a0b2; --accent: #6b93f2; --accent-text: #0e1116;
+    --auto: #56b083; --pinned: #e0a83f; --paused: #6aa6e8; --bad: #f27979; --expired: #7d8798;
+    --bar-usage: #56b083; --bar-manifest: #6d7888; --bar-vpa: #6b93f2; --bar-calc: #a493ee; --bar-pinned: #e0a83f; --bar-live: #8a97a8;
+    --warn-bg: #2d2611; --warn-line: #6b5a1f; --bad-bg: #2f1a1a; --bad-line: #7a3a3a;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+header { position: sticky; top: 0; z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line); }
+.bar { max-width: 1240px; margin: 0 auto; padding: 10px 20px; display: flex; align-items: center; gap: 16px; }
+.brand { font-weight: 650; letter-spacing: .2px; }
+.brand a { color: inherit; }
+.spacer { flex: 1; }
+.who { color: var(--muted); font-size: 13px; }
+.who b { color: var(--text); font-weight: 600; }
+main { max-width: 1240px; margin: 0 auto; padding: 20px; }
+h1 { font-size: 20px; margin: 0 0 4px; font-weight: 650; }
+h2 { font-size: 13px; margin: 0 0 10px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+.sub { color: var(--muted); margin-bottom: 16px; }
+.mono { font-family: var(--mono); font-size: 12.5px; }
+.muted { color: var(--muted); }
+
+input, select, button { font: inherit; color: inherit; }
+input[type=text], input[type=search], select { background: var(--surface); border: 1px solid var(--line-strong); border-radius: 6px; padding: 6px 9px; min-height: 32px; }
+input:focus-visible, select:focus-visible, button:focus-visible, tr[tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+input:disabled, select:disabled { opacity: .55; cursor: not-allowed; }
+button { border: 1px solid var(--line-strong); background: var(--surface); border-radius: 6px; padding: 6px 14px; min-height: 32px; cursor: pointer; }
+button:hover:not(:disabled) { border-color: var(--muted); }
+button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+
+.toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+.toolbar input[type=search] { width: 320px; max-width: 100%; }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 600; padding: 9px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td { padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+tbody tr[tabindex] { cursor: pointer; }
+tbody tr[tabindex]:hover { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.scroll { overflow-x: auto; }
+
+.badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+.badge::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.badge.auto { color: var(--auto); } .badge.pinned { color: var(--pinned); } .badge.paused { color: var(--paused); }
+.badge.expired { color: var(--expired); } .badge.expired::before { background: transparent; border: 1.5px solid currentColor; }
+.badge.error { color: var(--bad); }
+
+.notice { border: 1px solid var(--warn-line); background: var(--warn-bg); border-radius: 8px; padding: 9px 12px; margin-bottom: 12px; }
+.notice.bad { border-color: var(--bad-line); background: var(--bad-bg); }
+.banner { display: flex; gap: 14px; align-items: center; padding: 12px 16px; margin-bottom: 16px; }
+.banner .kv { display: flex; gap: 22px; flex-wrap: wrap; }
+.banner .kv div span { display: block; font-size: 12px; color: var(--muted); }
+
+.grid { display: grid; gap: 16px; }
+.container-card { padding: 16px; }
+.container-card > header { position: static; border: 0; background: none; display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
+.container-card > header h3 { margin: 0; font-size: 16px; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+@media (max-width: 900px) { .two { grid-template-columns: 1fr; } }
+
+.rows { display: grid; grid-template-columns: minmax(150px, 210px) 1fr; column-gap: 12px; row-gap: 5px; align-items: center; }
+.rows .lab { color: var(--muted); font-size: 13px; }
+.rows .lab small { display: block; font-size: 11.5px; opacity: .85; }
+.meter { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.track { flex: 1; height: 9px; background: color-mix(in srgb, var(--line) 70%, transparent); border-radius: 5px; overflow: hidden; position: relative; }
+.fill { height: 100%; border-radius: 5px; }
+.fill.clipped { background-image: repeating-linear-gradient(135deg, transparent 0 4px, rgba(255,255,255,.35) 4px 8px); }
+.val { font-family: var(--mono); font-size: 12.5px; min-width: 110px; text-align: right; white-space: nowrap; }
+.val em { font-style: normal; color: var(--muted); }
+
+@media (max-width: 600px) {
+  .rows { grid-template-columns: 1fr; row-gap: 2px; }
+  .rows .lab { margin-top: 8px; }
+  .val { min-width: 84px; }
+}
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 12px; }
+.legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+
+.live { margin-top: 10px; font-size: 12.5px; color: var(--muted); }
+
+.manage { padding: 16px; margin-top: 16px; }
+.seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 8px; overflow: hidden; margin-bottom: 14px; }
+.seg label { padding: 7px 14px; cursor: pointer; border-right: 1px solid var(--line-strong); user-select: none; }
+.seg label:last-child { border-right: 0; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label:has(input:checked) { background: var(--accent); color: var(--accent-text); font-weight: 600; }
+.seg label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
+.seg label:has(input:disabled) { opacity: .5; cursor: not-allowed; }
+.fields { display: grid; grid-template-columns: 140px 160px 160px 1fr; gap: 8px 12px; align-items: center; margin-bottom: 12px; }
+.fields .h { font-size: 12px; color: var(--muted); }
+.fields .fld > span { display: none; font-size: 12px; color: var(--muted); }
+.fields input[type=text] { width: 100%; font-family: var(--mono); }
+@media (max-width: 900px) {
+  .fields { grid-template-columns: 1fr 1fr; }
+  .fields .hh { display: none; }
+  .fields .cname { grid-column: 1 / -1; padding-top: 6px; }
+  .fields .fld > span { display: block; }
+  .fields .proj { grid-column: 1 / -1; }
+}
+.proj { font-size: 12.5px; color: var(--muted); }
+.proj.warn { color: var(--pinned); }
+.opts { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+.opts label { display: flex; align-items: center; gap: 8px; }
+.opts input[type=text] { min-width: 300px; }
+@media (max-width: 900px) {
+  .opts label { flex: 1 1 100%; }
+  .opts input[type=text] { min-width: 0; flex: 1; }
+}
+.actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.msg { font-size: 13px; }
+.msg.bad { color: var(--bad); } .msg.ok { color: var(--auto); }
+.empty, .loading { padding: 28px; text-align: center; color: var(--muted); }
+
+/* charts */
+:root { --c-usage: var(--bar-usage); --c-req: var(--bar-vpa); --c-lim: #cf5c5c; }
+@media (prefers-color-scheme: dark) { :root { --c-lim: #ea7f7f; } }
+.charts { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+.range { display: flex; align-items: center; gap: 12px; margin: 0 0 12px; flex-wrap: wrap; }
+.range .seg { margin-bottom: 0; }
+.chart { position: relative; min-width: 0; }
+.chart h4 { margin: 0 0 6px; font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+.chart svg { display: block; overflow: visible; touch-action: pan-y; }
+.lgs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+.lg { display: inline-flex; align-items: center; gap: 7px; padding: 2px 10px; min-height: 26px; font-size: 12.5px; border-radius: 13px; }
+.lg i { display: inline-block; width: 16px; height: 0; border-top: 3px solid; }
+.lg i.dash { border-top-style: dashed; }
+.lg[aria-pressed="false"] { opacity: .45; text-decoration: line-through; }
+.ax text { fill: var(--muted); font-size: 11px; font-family: system-ui, sans-serif; }
+.ax line { stroke: var(--line); }
+.ax line.zero { stroke: var(--line-strong); }
+.cross { stroke: var(--muted); stroke-dasharray: 3 3; }
+.tip { position: absolute; top: 34px; z-index: 3; pointer-events: none; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 8px; padding: 7px 10px; font-size: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.2); white-space: nowrap; }
+.tip .t { color: var(--muted); margin-bottom: 4px; }
+.tip .r { display: flex; justify-content: space-between; gap: 18px; align-items: center; }
+.tip .r b { font-family: var(--mono); font-weight: 600; }
+.tip i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+.chart-note { font-size: 12px; color: var(--muted); margin-top: 6px; }
+.chart-empty { height: 120px; display: flex; align-items: center; justify-content: center; color: var(--muted); border: 1px dashed var(--line-strong); border-radius: 8px; }
+
+/* impact of a change on the pods */
+.impact { margin: 0 0 14px; display: grid; gap: 6px; }
+.impact:empty { display: none; }
+.impact-head { font-weight: 650; font-size: 13.5px; }
+.impact-head.restart { color: var(--bad); }
+.eff { display: flex; gap: 10px; align-items: baseline; padding: 7px 10px; border-left: 3px solid var(--line-strong); background: color-mix(in srgb, var(--surface) 90%, var(--text)); border-radius: 0 6px 6px 0; font-size: 13px; }
+.eff .tag { flex: none; min-width: 108px; font-size: 11px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--muted); }
+.eff.restart { border-left-color: var(--bad); } .eff.restart .tag { color: var(--bad); }
+.eff.warn { border-left-color: var(--pinned); } .eff.warn .tag { color: var(--pinned); }
+.eff.ok { border-left-color: var(--auto); } .eff.ok .tag { color: var(--auto); }
+.eff .cn { color: var(--muted); }
+@media (max-width: 600px) { .eff { flex-direction: column; gap: 2px; } .eff .tag { min-width: 0; } }
+
+.freeze { display: flex; gap: 10px; align-items: flex-start; margin: 0 0 14px; cursor: pointer; }
+.freeze input { margin-top: 3px; }
+.freeze small { display: block; color: var(--muted); font-size: 12.5px; }
+#pinFields.dim { opacity: .45; }
+</style>
+</head>
+<body>
+<header><div class="bar">
+  <div class="brand"><a href="#/">FilletKnifeVPA</a></div>
+  <div class="spacer"></div>
+  <div class="who" id="who"></div>
+</div></header>
+<main id="app"><div class="loading">Загрузка…</div></main>
+
+<script>
+"use strict";
+
+// ---------- helpers ----------
+const $ = (sel, root = document) => root.querySelector(sel);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const app = $("#app");
+let config = { user: "", canWrite: false, readOnly: false, defaultTtlHours: 168, maxTtlHours: 720, userHeader: "" };
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts });
+  let body = null;
+  try { body = await res.json(); } catch (_) {}
+  if (!res.ok) throw new Error((body && body.error) || `${res.status} ${res.statusText}`);
+  return body;
+}
+
+// CPU is handled in millicores, memory in bytes.
+function fmtCPU(m) {
+  if (m == null || isNaN(m)) return "—";
+  if (m < 1000) return `${Math.round(m)}m`;
+  return `${(m / 1000).toFixed(2).replace(/\.?0+$/, "")} CPU`;
+}
+function fmtMem(b) {
+  if (b == null || isNaN(b)) return "—";
+  const Ki = 1024, Mi = Ki * 1024, Gi = Mi * 1024;
+  if (b >= Gi) return `${(b / Gi).toFixed(2).replace(/\.?0+$/, "")} Gi`;
+  if (b >= Mi) return `${Math.round(b / Mi)} Mi`;
+  if (b >= Ki) return `${Math.round(b / Ki)} Ki`;
+  return `${Math.round(b)} B`;
+}
+function parseCPU(s) {
+  s = String(s).trim();
+  if (!s) return NaN;
+  if (/^\d+(\.\d+)?m$/.test(s)) return parseFloat(s);
+  if (/^\d+(\.\d+)?$/.test(s)) return parseFloat(s) * 1000;
+  return NaN;
+}
+function parseMem(s) {
+  const m = String(s).trim().match(/^(\d+(?:\.\d+)?)\s*(Ki|Mi|Gi|Ti|k|K|M|G|T)?$/);
+  if (!m) return NaN;
+  const unit = { Ki: 1024, Mi: 1024 ** 2, Gi: 1024 ** 3, Ti: 1024 ** 4, k: 1e3, K: 1e3, M: 1e6, G: 1e9, T: 1e12 }[m[2]] || 1;
+  return parseFloat(m[1]) * unit;
+}
+function ago(iso) {
+  const d = new Date(iso), diff = (Date.now() - d) / 1000, abs = Math.abs(diff);
+  const units = [[86400, "дн."], [3600, "ч"], [60, "мин"]];
+  let text = "меньше минуты";
+  for (const [sec, name] of units) { if (abs >= sec) { text = `${Math.floor(abs / sec)} ${name}`; break; } }
+  return diff >= 0 ? `${text} назад` : `через ${text}`;
+}
+const when = iso => `${new Date(iso).toLocaleString("ru-RU", { dateStyle: "medium", timeStyle: "short" })} (${ago(iso)})`;
+
+function stateOf(v) {
+  if (v.overrideError) return { key: "error", label: "Ошибка оверрайда" };
+  const o = v.override;
+  if (!o) return { key: "auto", label: "Автопилот" };
+  if (o.expired) return { key: "expired", label: "Срок истёк" };
+  return o.mode === "Pinned" ? { key: "pinned", label: "Закреплено" } : { key: "paused", label: "Заморожено" };
+}
+const badge = s => `<span class="badge ${s.key}">${esc(s.label)}</span>`;
+
+// ---------- list ----------
+async function showList() {
+  app.innerHTML = `<div class="loading">Загрузка…</div>`;
+  let items;
+  try { items = (await api("/api/vpas")).items; }
+  catch (e) { app.innerHTML = `<div class="notice bad">Не удалось загрузить список: ${esc(e.message)}</div>`; return; }
+
+  const order = { pinned: 0, paused: 1, error: 2, expired: 3, auto: 4 };
+  items.sort((a, b) => order[stateOf(a).key] - order[stateOf(b).key] || (a.namespace + a.name).localeCompare(b.namespace + b.name));
+
+  app.innerHTML = `
+    <h1>Все VPA</h1>
+    <div class="sub">Выберите VPA, чтобы увидеть рекомендацию рядом с манифестом и потреблением, закрепить свои значения или вернуть автопилот.</div>
+    <div class="toolbar">
+      <input type="search" id="q" placeholder="Поиск: namespace, VPA, workload, автор" aria-label="Поиск">
+      <select id="st" aria-label="Состояние">
+        <option value="">Все состояния</option><option value="pinned">Закреплено</option><option value="paused">Заморожено</option>
+        <option value="auto">Автопилот</option><option value="expired">Срок истёк</option><option value="error">Ошибка оверрайда</option>
+      </select>
+      <button id="refresh">Обновить</button>
+      <span class="muted" id="count"></span>
+    </div>
+    <div class="card scroll"><table>
+      <thead><tr><th>Namespace</th><th>VPA</th><th>Workload</th><th>updateMode</th><th>Recommender</th><th>Состояние</th><th>Рекомендация (target)</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table></div>`;
+
+  const draw = () => {
+    const q = $("#q").value.trim().toLowerCase(), st = $("#st").value;
+    const shown = items.filter(v => {
+      if (st && stateOf(v).key !== st) return false;
+      const hay = [v.namespace, v.name, v.targetRef.kind, v.targetRef.name, v.override && v.override.setBy].join(" ").toLowerCase();
+      return !q || hay.includes(q);
+    });
+    $("#count").textContent = `${shown.length} из ${items.length}`;
+    $("#rows").innerHTML = shown.length ? shown.map(v => {
+      const s = stateOf(v);
+      const rec = Object.entries(v.recommended || {}).map(([n, r]) => r ? `<div class="mono">${esc(n)}: ${fmtCPU(r.cpuMilli)} · ${fmtMem(r.memoryBytes)}</div>` : "").join("") || `<span class="muted">нет</span>`;
+      const who = v.override ? `<div class="muted" style="font-size:12px">${esc(v.override.setBy)} · до ${new Date(v.override.expiresAt).toLocaleDateString("ru-RU")}</div>` : "";
+      return `<tr tabindex="0" data-href="#/${encodeURIComponent(v.namespace)}/${encodeURIComponent(v.name)}">
+        <td>${esc(v.namespace)}</td><td><b>${esc(v.name)}</b></td>
+        <td class="muted">${esc(v.targetRef.kind)}/${esc(v.targetRef.name)}</td>
+        <td>${esc(v.updateMode)}</td><td>${esc(v.recommender)}</td>
+        <td>${badge(s)}${who}</td><td>${rec}</td></tr>`;
+    }).join("") : `<tr><td colspan="7" class="empty">Ничего не найдено</td></tr>`;
+  };
+  draw();
+  $("#q").addEventListener("input", draw);
+  $("#st").addEventListener("change", draw);
+  $("#refresh").addEventListener("click", showList);
+  $("#rows").addEventListener("click", e => { const tr = e.target.closest("tr[data-href]"); if (tr) location.hash = tr.dataset.href; });
+  $("#rows").addEventListener("keydown", e => { if (e.key === "Enter") { const tr = e.target.closest("tr[data-href]"); if (tr) location.hash = tr.dataset.href; } });
+}
+
+// ---------- detail ----------
+const COLORS = { usage: "var(--bar-usage)", manifest: "var(--bar-manifest)", vpa: "var(--bar-vpa)", calc: "var(--bar-calc)", pinned: "var(--bar-pinned)", live: "var(--bar-live)" };
+
+// One resource of one container: every source on a common scale.
+function meters(kind, c, fmt) {
+  const val = (r) => r == null ? null : (kind === "cpu" ? r.cpuMilli : r.memoryBytes);
+  const usage = c.usage && c.usage.pods > 0 ? c.usage : null;
+  const live = (c.live && c.live[0]) || null;
+  const rows = [];
+  const add = (label, sub, v, color, extra = "") => { if (v != null && v > 0) rows.push({ label, sub, v, color, extra }); };
+
+  add("Потребление сейчас", usage ? `среднее по ${usage.pods} под.` : "", usage && (kind === "cpu" ? usage.cpuCoresAvg * 1000 : usage.memoryBytesAvg), COLORS.usage);
+  add("Потребление, максимум", "по подам", usage && (kind === "cpu" ? usage.cpuCoresMax * 1000 : usage.memoryBytesMax), COLORS.usage);
+  add("Манифест: request", "изначально", val(c.initial && c.initial.requests), COLORS.manifest);
+  add("Манифест: limit", "изначально", val(c.initial && c.initial.limits), COLORS.manifest, "limit");
+  add("На подах: request", live ? `${live.pods} под.${c.live.length > 1 ? ` (+${c.live.length - 1} др. группы)` : ""}` : "", val(live && live.requests), COLORS.live);
+  add("На подах: limit", "", val(live && live.limits), COLORS.live, "limit");
+  add("Рекомендация VPA", c.vpa && c.vpa.lowerBound ? `коридор ${fmt(val(c.vpa.lowerBound))} – ${fmt(val(c.vpa.upperBound))}` : "", val(c.vpa && c.vpa.target), COLORS.vpa);
+  add("Расчёт сейчас", "что посчитал бы recommender", val(c.computed && c.computed.target), COLORS.calc);
+  add("Закреплено", "ваш оверрайд", val(c.pinned), COLORS.pinned);
+
+  if (!rows.length) return `<div class="muted">Нет данных</div>`;
+  const scale = Math.max(...rows.filter(r => r.extra !== "limit").map(r => r.v), 1) * 1.12;
+  return `<div class="rows">${rows.map(r => {
+    const pct = r.v / scale * 100, clipped = pct > 100;
+    return `<div class="lab">${esc(r.label)}${r.sub ? `<small>${esc(r.sub)}</small>` : ""}</div>
+      <div class="meter"><div class="track"><div class="fill ${clipped ? "clipped" : ""}" style="width:${Math.min(pct, 100)}%;background:${r.color}"></div></div>
+      <div class="val">${fmt(r.v)}${clipped ? " <em>→</em>" : ""}</div></div>`;
+  }).join("")}</div>`;
+}
+
+function projectedLimit(c, res, requestText) {
+  const ratio = c.limitRatio && c.limitRatio[res];
+  const parse = res === "cpu" ? parseCPU : parseMem, fmt = res === "cpu" ? fmtCPU : fmtMem;
+  if (ratio == null) return { text: "лимит не задан в манифесте", warn: false };
+  const v = parse(requestText);
+  if (isNaN(v)) return { text: "", warn: false };
+  if (ratio === 1) return { text: `лимит = запрос = ${fmt(v)}`, warn: false };
+  const r = ratio.toFixed(2).replace(/\.?0+$/, "");
+  return { text: `лимит ≈ ${fmt(v * ratio)} (×${r} — пропорция манифеста)`, warn: ratio >= 5 };
+}
+
+async function showDetail(namespace, name) {
+  app.innerHTML = `<div class="loading">Загрузка…</div>`;
+  let v;
+  try { v = await api(`/api/vpas/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}`); }
+  catch (e) { app.innerHTML = `<p><a href="#/">← Все VPA</a></p><div class="notice bad">${esc(e.message)}</div>`; return; }
+
+  const s = stateOf(v), o = v.override;
+  const notes = [];
+  if (v.updateMode === "Off") notes.push(`<div class="notice">У VPA <b>updateMode: Off</b>: рекомендация попадает в статус, но updater не применяет её к подам — закреплённые значения тоже.</div>`);
+  if (v.workloadError) notes.push(`<div class="notice">Workload прочитать не удалось (${esc(v.workloadError)}), поэтому нет манифестных значений и живых подов.</div>`);
+  if (v.overrideError) notes.push(`<div class="notice bad">Оверрайд на VPA повреждён и <b>игнорируется</b>, recommender считает как обычно: ${esc(v.overrideError)}. Можно вернуть автопилот — это очистит аннотации.</div>`);
+  if (o && o.expired) notes.push(`<div class="notice">Срок оверрайда истёк ${when(o.expiresAt)}; recommender уже считает как обычно. Аннотации остались — их можно очистить, вернув автопилот.</div>`);
+
+  const banner = o && !o.expired ? `<div class="card banner">${badge(s)}<div class="kv">
+      <div><span>Кто выставил</span><b>${esc(o.setBy)}</b></div>
+      <div><span>Когда</span>${when(o.setAt)}</div>
+      <div><span>Действует до</span>${when(o.expiresAt)}</div>
+      ${o.reason ? `<div><span>Причина</span>${esc(o.reason)}</div>` : ""}</div></div>` : "";
+
+  const cards = v.containers.map(c => `
+    <section class="card container-card"><header><h3>${esc(c.name)}</h3><span class="muted">контейнер</span></header>
+      ${c.computedError ? `<div class="notice">Расчёт недоступен: ${esc(c.computedError)}</div>` : ""}
+      ${c.usageError ? `<div class="notice">Потребление недоступно: ${esc(c.usageError)}</div>` : ""}
+      <div class="two"><div><h2>CPU</h2>${meters("cpu", c, fmtCPU)}</div><div><h2>Память</h2>${meters("memory", c, fmtMem)}</div></div>
+      ${liveNote(c)}
+      <div class="charts"><div class="two">
+        <div class="chart" data-c="${esc(c.name)}" data-res="cpu"><div class="chart-empty">Загрузка графика…</div></div>
+        <div class="chart" data-c="${esc(c.name)}" data-res="memory"><div class="chart-empty">Загрузка графика…</div></div>
+      </div></div>
+    </section>`).join("");
+
+  const legend = `<div class="legend">${[["usage", "потребление"], ["manifest", "манифест (Deployment/Helm)"], ["live", "на подах сейчас"], ["vpa", "рекомендация VPA"], ["calc", "расчёт сейчас"], ["pinned", "закреплено"]]
+    .map(([k, t]) => `<span><i style="background:${COLORS[k]}"></i>${t}</span>`).join("")}<span>штриховка со стрелкой — значение больше шкалы</span></div>`;
+
+  app.innerHTML = `
+    <p><a href="#/">← Все VPA</a></p>
+    <h1>${esc(v.namespace)} / ${esc(v.name)} ${badge(s)}</h1>
+    <div class="sub">${esc(v.targetRef.kind)}/${esc(v.targetRef.name)}${v.helm ? ` · Helm-релиз <b>${esc(v.helm.release)}</b>` : ""} · updateMode <b>${esc(v.updateMode)}</b> · recommender <b>${esc(v.recommender)}</b></div>
+    ${notes.join("")}${banner}
+    <div class="range"><span class="muted">Графики за</span><div class="seg" role="radiogroup" aria-label="Период графиков">${CHART_RANGES.map(([k, t]) => `<label><input type="radio" name="crange" value="${k}" ${k === chartRange ? "checked" : ""}>${t}</label>`).join("")}</div></div>
+    <div class="grid">${cards || `<div class="card empty">У VPA пока нет контейнеров: нет ни workload, ни рекомендации.</div>`}</div>
+    ${legend}
+    ${manageForm(v)}`;
+  bindForm(v);
+  document.querySelectorAll('input[name="crange"]').forEach(r => r.addEventListener("change", () => { chartRange = r.value; loadCharts(v); }));
+  loadCharts(v);
+}
+
+function liveNote(c) {
+  if (!c.live || c.live.length < 2) return "";
+  return `<div class="live">На подах сейчас разные значения: ${c.live.map(g => `${g.pods} под. — request ${g.requests ? `${fmtCPU(g.requests.cpuMilli)} / ${fmtMem(g.requests.memoryBytes)}` : "—"}`).join("; ")}.</div>`;
+}
+
+// ---------- charts ----------
+const CHART_RANGES = [["1h", "1 ч"], ["6h", "6 ч"], ["24h", "24 ч"], ["3d", "3 дня"], ["7d", "7 дней"]];
+let chartRange = "6h";
+let chartToken = 0;
+
+const SERIES = [
+  { key: "usage", label: "Потребление", color: "var(--c-usage)", kind: "line" },
+  { key: "requests", label: "Requests", color: "var(--c-req)", kind: "step" },
+  { key: "limits", label: "Limits", color: "var(--c-lim)", kind: "step", dash: "6 4" },
+];
+const RESOURCES = {
+  cpu: { title: "CPU", disp: v => v * 1000, fmt: fmtCPU },
+  memory: { title: "Память", disp: v => v, fmt: fmtMem },
+};
+
+function niceStep(raw) {
+  const p = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / p;
+  return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p;
+}
+
+// A gap longer than a few steps is missing data (a pod restarted): break the line there.
+function segments(points, step) {
+  const out = [];
+  let cur = [];
+  for (const p of points) {
+    if (cur.length && p[0] - cur[cur.length - 1][0] > step * 2.5) { out.push(cur); cur = []; }
+    cur.push(p);
+  }
+  if (cur.length) out.push(cur);
+  return out;
+}
+
+function pathFor(segs, kind, x, y) {
+  return segs.map(seg => {
+    const pt = p => `${x(p[0]).toFixed(1)},${y(p[1]).toFixed(1)}`;
+    if (seg.length === 1) return `M${pt(seg[0])}h.01`;
+    if (kind === "step") {
+      let d = `M${pt(seg[0])}`;
+      for (let i = 1; i < seg.length; i++) d += `H${x(seg[i][0]).toFixed(1)}V${y(seg[i][1]).toFixed(1)}`;
+      return d;
+    }
+    return seg.map((p, i) => `${i ? "L" : "M"}${pt(p)}`).join("");
+  }).join("");
+}
+
+function fmtClock(sec, span) {
+  const d = new Date(sec * 1000);
+  return span <= 86400
+    ? d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })
+    : d.toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
+// spec: { res, start, end, step, series: {usage, requests, limits} of [[t, v], ...] }
+function drawChart(el, spec) {
+  const res = RESOURCES[spec.res];
+  const hidden = el._hidden || (el._hidden = new Set());
+  const has = key => spec.series[key] && spec.series[key].length > 0;
+  const legend = SERIES.filter(s => has(s.key)).map(s =>
+    `<button type="button" class="lg" data-key="${s.key}" aria-pressed="${!hidden.has(s.key)}"><i class="${s.dash ? "dash" : ""}" style="border-top-color:${s.color}"></i>${s.label}</button>`).join("");
+
+  const shown = SERIES.filter(s => has(s.key) && !hidden.has(s.key));
+  const all = SERIES.filter(s => has(s.key));
+  if (!all.length) {
+    el.innerHTML = `<h4>${res.title}</h4><div class="chart-empty">Нет данных за период</div>`;
+    return;
+  }
+
+  const W = Math.max(280, Math.floor(el.clientWidth)), H = 220, m = { l: 56, r: 10, t: 8, b: 24 };
+  const vmax = Math.max(0, ...shown.flatMap(s => spec.series[s.key].map(p => res.disp(p[1]))));
+  const tickStep = niceStep((vmax || 1) / 4);
+  const top = Math.max(tickStep, Math.ceil(vmax / tickStep - 1e-9) * tickStep);
+  const span = spec.end - spec.start;
+  const x = t => m.l + (t - spec.start) / span * (W - m.l - m.r);
+  const y = v => m.t + (1 - res.disp(v) / top) * (H - m.t - m.b);
+
+  let grid = "";
+  for (let v = 0; v <= top + tickStep / 2; v += tickStep) {
+    const yy = (m.t + (1 - v / top) * (H - m.t - m.b)).toFixed(1);
+    grid += `<line class="${v === 0 ? "zero" : ""}" x1="${m.l}" x2="${W - m.r}" y1="${yy}" y2="${yy}"/><text x="${m.l - 8}" y="${+yy + 4}" text-anchor="end">${res.fmt(v)}</text>`;
+  }
+  for (let i = 0; i < 5; i++) {
+    const t = spec.start + span * i / 4;
+    grid += `<text x="${x(t).toFixed(1)}" y="${H - 6}" text-anchor="${i === 0 ? "start" : i === 4 ? "end" : "middle"}">${fmtClock(t, span)}</text>`;
+  }
+  const paths = shown.map(s => `<path d="${pathFor(segments(spec.series[s.key], spec.step), s.kind, x, y)}" style="fill:none;stroke:${s.color};stroke-width:1.7;stroke-linejoin:round;stroke-linecap:round;${s.dash ? `stroke-dasharray:${s.dash}` : ""}"/>`).join("");
+  const label = `${res.title}: ${all.map(s => s.label).join(", ")}`;
+
+  el.innerHTML = `<h4>${res.title}</h4><div class="lgs">${legend}</div>
+    <svg width="${W}" height="${H}" role="img" aria-label="${esc(label)}"><g class="ax">${grid}</g>${paths}
+      <line class="cross" y1="${m.t}" y2="${H - m.b}" hidden/><rect class="hit" x="${m.l}" y="${m.t}" width="${W - m.l - m.r}" height="${H - m.t - m.b}" fill="transparent"/></svg>
+    <div class="tip" hidden></div>
+    ${!has("requests") && !has("limits") ? `<div class="chart-note">Requests и limits не найдены в VictoriaMetrics — проверьте, что собираются <span class="mono">kube_pod_container_resource_*</span> (kube-state-metrics).</div>` : ""}`;
+
+  el.querySelectorAll(".lg").forEach(b => b.addEventListener("click", () => {
+    hidden.has(b.dataset.key) ? hidden.delete(b.dataset.key) : hidden.add(b.dataset.key);
+    drawChart(el, spec);
+  }));
+
+  const svg = $("svg", el), cross = $(".cross", el), tip = $(".tip", el);
+  const move = e => {
+    const box = svg.getBoundingClientRect(), px = e.clientX - box.left;
+    if (px < m.l || px > W - m.r) return leave();
+    const t = spec.start + (px - m.l) / (W - m.l - m.r) * span;
+    const rows = shown.map(s => {
+      let best = null;
+      for (const p of spec.series[s.key]) if (best === null || Math.abs(p[0] - t) < Math.abs(best[0] - t)) best = p;
+      const near = best && Math.abs(best[0] - t) <= spec.step * 1.5;
+      return `<div class="r"><span><i style="background:${s.color}"></i>${s.label}</span><b>${near ? res.fmt(res.disp(best[1])) : "—"}</b></div>`;
+    }).join("");
+    cross.setAttribute("x1", px); cross.setAttribute("x2", px); cross.removeAttribute("hidden");
+    tip.innerHTML = `<div class="t">${new Date(t * 1000).toLocaleString("ru-RU", { dateStyle: "medium", timeStyle: "medium" })}</div>${rows}`;
+    tip.removeAttribute("hidden");
+    const w = tip.offsetWidth, host = el.getBoundingClientRect();
+    tip.style.left = `${Math.max(0, Math.min(px + 14, host.width - w))}px`;
+  };
+  const leave = () => { cross.setAttribute("hidden", ""); tip.setAttribute("hidden", ""); };
+  const hit = $(".hit", el);
+  hit.addEventListener("pointermove", move);
+  hit.addEventListener("pointerdown", move);
+  hit.addEventListener("pointerleave", leave);
+}
+
+async function loadCharts(v) {
+  const token = ++chartToken;
+  const slots = [...document.querySelectorAll(".chart[data-c]")];
+  slots.forEach(el => { el.innerHTML = `<div class="chart-empty">Загрузка графика…</div>`; });
+  let h;
+  try { h = await api(`/api/vpas/${encodeURIComponent(v.namespace)}/${encodeURIComponent(v.name)}/history?range=${encodeURIComponent(chartRange)}`); }
+  catch (e) {
+    if (token === chartToken) slots.forEach(el => { el.innerHTML = `<div class="notice bad">Не удалось загрузить график: ${esc(e.message)}</div>`; });
+    return;
+  }
+  if (token !== chartToken) return;
+  const byName = Object.fromEntries(h.containers.map(c => [c.name, c]));
+  for (const el of slots) {
+    const c = byName[el.dataset.c];
+    if (!c) { el.innerHTML = `<div class="chart-empty">Нет данных</div>`; continue; }
+    if (c.error) { el.innerHTML = `<div class="notice">График недоступен: ${esc(c.error)}</div>`; continue; }
+    const spec = { res: el.dataset.res, start: h.start, end: h.end, step: h.stepSeconds, series: c.history[el.dataset.res] };
+    drawChart(el, spec);
+    if (window.ResizeObserver) {
+      let width = el.clientWidth;
+      if (el._ro) el._ro.disconnect();
+      el._ro = new ResizeObserver(() => { if (Math.abs(el.clientWidth - width) > 8 && token === chartToken) { width = el.clientWidth; drawChart(el, spec); } });
+      el._ro.observe(el);
+    }
+  }
+}
+
+// ---------- manage ----------
+function initialValue(c, res) {
+  const pick = r => r && (res === "cpu" ? r.cpu : r.memory);
+  return pick(c.pinned) || pick(c.vpa && c.vpa.target) || pick(c.computed && c.computed.target)
+      || pick(c.live && c.live[0] && c.live[0].requests) || pick(c.initial && c.initial.requests) || "";
+}
+
+function manageForm(v) {
+  const o = v.override && !v.override.expired ? v.override : null;
+  const can = config.canWrite;
+  const why = config.readOnly ? "Страница в режиме только для чтения." : `Не удалось определить, кто вы: нет заголовка ${esc(config.userHeader)}, а изменение без автора не записывается.`;
+  const frozen = !!o && o.mode === "Paused";
+  const ttls = [[1, "1 час"], [8, "8 часов"], [24, "1 день"], [72, "3 дня"], [168, "7 дней"], [336, "14 дней"], [720, "30 дней"]].filter(([h]) => h <= config.maxTtlHours);
+  const defTtl = ttls.reduce((best, t) => Math.abs(t[0] - config.defaultTtlHours) < Math.abs(best[0] - config.defaultTtlHours) ? t : best, ttls[0]);
+  const rows = v.containers.map(c => `
+    <div class="h cname" style="align-self:start;padding-top:7px"><b>${esc(c.name)}</b></div>
+    <label class="fld"><span>CPU (request)</span><input type="text" data-c="${esc(c.name)}" data-r="cpu" value="${esc(initialValue(c, "cpu"))}" aria-label="CPU ${esc(c.name)}" placeholder="700m" ${can ? "" : "disabled"}></label>
+    <label class="fld"><span>Память (request)</span><input type="text" data-c="${esc(c.name)}" data-r="memory" value="${esc(initialValue(c, "memory"))}" aria-label="Память ${esc(c.name)}" placeholder="300Mi" ${can ? "" : "disabled"}></label>
+    <div class="proj" data-proj="${esc(c.name)}"></div>`).join("");
+
+  return `<section class="card manage"><h2>Управление</h2>
+    ${can ? "" : `<div class="notice">${why} Изменять нельзя, смотреть можно.</div>`}
+    <div id="pinFields">
+      <div class="fields"><div class="h hh">Контейнер</div><div class="h hh">CPU (request)</div><div class="h hh">Память (request)</div><div class="h hh">Лимит после применения</div>${rows}</div>
+      <div class="muted" style="font-size:12.5px;margin:-4px 0 14px">Лимит вы не задаёте: его считает admission-controller, сохраняя пропорцию limit/request из манифеста. Закреплённые значения не проходят расчётный минимум (<span class="mono">--pod-recommendation-min-*</span>).</div>
+    </div>
+    <label class="freeze"><input type="checkbox" id="freeze" ${frozen ? "checked" : ""} ${can ? "" : "disabled"}>
+      <span><b>Заморозить как есть</b><small>Свои значения не задавать: recommender перестаёт менять рекомендацию, остаётся та, что сейчас в статусе VPA. Значения выше при этом не используются.</small></span></label>
+    <div class="impact" id="impact" aria-live="polite"></div>
+    <div class="opts">
+      <label>Действует <select id="ttl" ${can ? "" : "disabled"}>${ttls.map(([h, t]) => `<option value="${h}" ${h === defTtl[0] ? "selected" : ""}>${t}</option>`).join("")}</select></label>
+      <label>Причина <input type="text" id="reason" maxlength="300" placeholder="например: релиз, заморозка, инцидент" value="${esc(o ? o.reason || "" : "")}" ${can ? "" : "disabled"}></label>
+    </div>
+    <div class="actions">
+      <button class="primary" id="apply" ${can ? "" : "disabled"}>Применить</button>
+      <button id="clear" ${can && (v.override || v.overrideError) ? "" : "disabled"}>Вернуть в автопилот</button>
+      <span class="msg" id="msg" role="status"></span>
+    </div>
+    ${o || v.overrideError ? `<div class="impact" id="autoImpact" style="margin:14px 0 0" aria-live="polite"></div>` : ""}</section>`;
+}
+
+const TAGS = { restart: "перезапуск", warn: "внимание", ok: "без перезапуска", info: "к сведению" };
+
+// What a change does to the pods, as the server worked it out.
+function renderImpact(imp, title) {
+  const multi = imp.containers.length > 1;
+  const rows = imp.containers.flatMap(c => c.effects.map(e =>
+    `<div class="eff ${e.level}"><span class="tag">${TAGS[e.level] || e.level}</span><span>${multi ? `<span class="cn">${esc(c.name)}: </span>` : ""}${esc(e.text)}</span></div>`)).join("");
+  const head = imp.restarts ? `<div class="impact-head restart">${esc(title)}: поды будут перезапущены</div>` : `<div class="impact-head">${esc(title)}</div>`;
+  return head + rows;
+}
+
+// The effects that need a decision before the button is pressed: restarts and what will not work.
+function impactLines(imp) {
+  const multi = imp.containers.length > 1;
+  return imp.containers.flatMap(c => c.effects.filter(e => e.level === "restart" || e.level === "warn")
+    .map(e => `• ${TAGS[e.level].toUpperCase()}: ${multi ? `${c.name}: ` : ""}${e.text}`));
+}
+
+function bindForm(v) {
+  const base = `/api/vpas/${encodeURIComponent(v.namespace)}/${encodeURIComponent(v.name)}`;
+  const msg = (text, cls = "") => { const el = $("#msg"); if (el) { el.textContent = text; el.className = `msg ${cls}`; } };
+  const field = (name, res) => $(`input[data-c="${CSS.escape(name)}"][data-r="${res}"]`);
+  const impact = body => api(`${base}/impact`, { method: "POST", body: JSON.stringify(body) });
+
+  const refreshProjections = () => {
+    for (const c of v.containers) {
+      const pc = projectedLimit(c, "cpu", field(c.name, "cpu").value), pm = projectedLimit(c, "memory", field(c.name, "memory").value);
+      const el = $(`[data-proj="${CSS.escape(c.name)}"]`);
+      el.innerHTML = [pc.text && `CPU: ${esc(pc.text)}`, pm.text && `память: ${esc(pm.text)}`].filter(Boolean).join("<br>");
+      el.className = `proj ${pc.warn || pm.warn ? "warn" : ""}`;
+    }
+  };
+
+  // What the form asks for, or why it cannot be understood yet.
+  const readForm = () => {
+    if ($("#freeze").checked) return { body: { mode: "Paused" } };
+    const mode = "Pinned";
+    const containers = {};
+    for (const c of v.containers) {
+      const cpu = field(c.name, "cpu").value.trim(), memory = field(c.name, "memory").value.trim();
+      if (isNaN(parseCPU(cpu))) return { error: `${c.name}: CPU «${cpu}» не похож на значение (например 700m или 0.7)` };
+      if (isNaN(parseMem(memory))) return { error: `${c.name}: память «${memory}» не похожа на значение (например 300Mi)` };
+      containers[c.name] = { cpu, memory };
+    }
+    return { body: { mode, containers } };
+  };
+
+  // Live: what pressing the button would do to the pods, worked out while the value is typed.
+  let seq = 0, timer;
+  const showImpact = async () => {
+    const box = $("#impact"), mine = ++seq, form = readForm();
+    if (form.error) { box.innerHTML = `<div class="muted" style="font-size:12.5px">${esc(form.error)}</div>`; return; }
+    try {
+      const imp = await impact(form.body);
+      if (mine === seq) box.innerHTML = renderImpact(imp, "Что будет с подами");
+    } catch (e) {
+      if (mine === seq) box.innerHTML = `<div class="muted" style="font-size:12.5px">Не удалось оценить последствия для подов: ${esc(e.message)}</div>`;
+    }
+  };
+  const scheduleImpact = () => { clearTimeout(timer); timer = setTimeout(showImpact, 350); };
+
+  // Before writing: ask again, so what is confirmed is what is about to happen.
+  const confirmImpact = async (body, intro, alwaysAsk) => {
+    let imp;
+    try { imp = await impact(body); }
+    catch (e) { return confirm(`${intro}\n\nНе удалось оценить последствия для подов: ${e.message}\n\nПродолжить?`); }
+    const lines = impactLines(imp);
+    if (!lines.length) return alwaysAsk ? confirm(intro) : true;
+    return confirm(`${intro}\n\n${lines.join("\n")}\n\nПродолжить?`);
+  };
+
+  // Frozen: the values are not used, so they are shown dimmed and cannot be edited.
+  const applyFreeze = () => {
+    const frozen = $("#freeze").checked;
+    $("#pinFields").classList.toggle("dim", frozen);
+    document.querySelectorAll("#pinFields input[type=text]").forEach(i => { i.disabled = frozen || !config.canWrite; });
+  };
+  $("#freeze").addEventListener("change", () => { applyFreeze(); scheduleImpact(); });
+  document.querySelectorAll("#pinFields input[type=text]").forEach(i => i.addEventListener("input", () => { refreshProjections(); scheduleImpact(); }));
+  applyFreeze(); refreshProjections(); showImpact();
+
+  if ($("#autoImpact")) {
+    impact({ mode: "Auto" }).then(imp => { $("#autoImpact").innerHTML = renderImpact(imp, "Если вернуть в автопилот"); }).catch(() => {});
+  }
+
+  $("#apply").addEventListener("click", async () => {
+    const form = readForm();
+    if (form.error) return msg(form.error, "bad");
+    const body = { ...form.body, ttlHours: Number($("#ttl").value), reason: $("#reason").value };
+    $("#apply").disabled = true; msg("Проверяю последствия…");
+    if (!(await confirmImpact(form.body, "Применить значения?", false))) { $("#apply").disabled = false; return msg(""); }
+    msg("Сохраняю…");
+    try { await api(`${base}/override`, { method: "PUT", body: JSON.stringify(body) }); await showDetail(v.namespace, v.name); $("#msg").textContent = "Сохранено. Recommender учтёт это в течение цикла."; $("#msg").className = "msg ok"; }
+    catch (e) { msg(e.message, "bad"); $("#apply").disabled = false; }
+  });
+
+  $("#clear").addEventListener("click", async () => {
+    $("#clear").disabled = true; msg("Проверяю последствия…");
+    if (!(await confirmImpact({ mode: "Auto" }, "Вернуть VPA в автопилот? Recommender снова начнёт считать значения сам.", true))) { $("#clear").disabled = false; return msg(""); }
+    msg("Сохраняю…");
+    try { await api(`${base}/override`, { method: "DELETE" }); await showDetail(v.namespace, v.name); $("#msg").textContent = "Автопилот возвращён."; $("#msg").className = "msg ok"; }
+    catch (e) { msg(e.message, "bad"); $("#clear").disabled = false; }
+  });
+}
+
+// ---------- boot ----------
+function route() {
+  const parts = location.hash.replace(/^#\/?/, "").split("/").filter(Boolean).map(decodeURIComponent);
+  if (parts.length >= 2) showDetail(parts[0], parts[1]); else showList();
+}
+async function boot() {
+  try { config = await api("/api/config"); } catch (_) {}
+  $("#who").innerHTML = config.user ? `вы: <b>${esc(config.user)}</b>${config.readOnly ? " · только чтение" : ""}` : `<span title="нет заголовка ${esc(config.userHeader)}">пользователь не определён · только чтение</span>`;
+  window.addEventListener("hashchange", route);
+  route();
+}
+boot();
+</script>
+</body>
+</html>

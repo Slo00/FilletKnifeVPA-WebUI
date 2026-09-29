@@ -1,0 +1,138 @@
+# Web page for VPA recommendations and manual overrides. Works with the VPA fork
+# https://github.com/Slo00/FilletKnifeVPA (docs/adr/0003-manual-overrides.md there).
+#
+# WHO SET AN OVERRIDE is taken from a request header (--user-header) that an SSO
+# proxy in front of the page must set. The page has no login of its own and must not
+# be reachable except through that proxy: anyone who can reach it directly can write
+# as any user. Put the proxy in front of the Service, and keep it the only thing
+# allowed to talk to the pod (NetworkPolicy).
+#
+# The charts need the requests/limits series that kube-state-metrics exports
+# (kube_pod_container_resource_requests/limits) in the same VictoriaMetrics, scraped
+# with honor_labels. Without them the charts show usage only. The series names are
+# --chart-requests-metric and --chart-limits-metric.
+#
+# Image: kvltyapo4ka/vpa-ui:dev on Docker Hub (linux/amd64 and linux/arm64). To build your own:
+# docker buildx build --platform linux/amd64,linux/arm64 -t <your-registry>/vpa-ui:<tag> --push .
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vpa-ui
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:vpa-ui
+rules:
+  # Reads the VPAs and writes the override annotations, nothing else on them.
+  - apiGroups: ["autoscaling.k8s.io"]
+    resources: ["verticalpodautoscalers"]
+    verbs: ["get", "list", "patch"]
+  # The manifest values the workloads declare (what Helm rendered).
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets", "daemonsets", "replicasets"]
+    verbs: ["get"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get"]
+  # What the running pods actually have.
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["list"]
+  # A trail of who set and who cleared an override.
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:vpa-ui
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:vpa-ui
+subjects:
+  - kind: ServiceAccount
+    name: vpa-ui
+    namespace: kube-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vpa-ui
+  namespace: kube-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vpa-ui
+  template:
+    metadata:
+      labels:
+        app: vpa-ui
+        app.kubernetes.io/component: ui
+        app.kubernetes.io/name: vertical-pod-autoscaler
+    spec:
+      serviceAccountName: vpa-ui
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534 # nobody
+      containers:
+        - name: ui
+          image: kvltyapo4ka/vpa-ui:dev
+          imagePullPolicy: IfNotPresent
+          args:
+            - --listen=:8080
+            # The page takes the recommender's flags: start it with the same
+            # VictoriaMetrics settings the recommender has and it shows the very
+            # numbers the recommender calculates.
+            - --prometheus-address=http://vm-victoria-metrics-single-server.monitoring.svc:8428
+            - --prometheus-cadvisor-job-name=kubernetes-nodes-cadvisor
+            # Window and step of the calculation: the same as the recommender's, or
+            # the "calculated now" column would not match what it publishes.
+            - --history-length=1d
+            - --history-resolution=1m
+            - --user-header=X-Forwarded-User
+            - --default-override-ttl=168h
+            - --max-override-ttl=720h
+          resources:
+            limits:
+              cpu: 200m
+              memory: 256Mi
+            requests:
+              cpu: 20m
+              memory: 64Mi
+          ports:
+            - name: http
+              containerPort: 8080
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vpa-ui
+  namespace: kube-system
+spec:
+  selector:
+    app: vpa-ui
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

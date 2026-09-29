@@ -1,0 +1,7 @@
+# binaries
+/vpa-ui
+/ui
+*.bin
+*.test
+*.out
+.DS_Store

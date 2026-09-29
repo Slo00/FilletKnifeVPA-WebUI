@@ -1,0 +1,5 @@
+*.bin
+/vpa-ui
+/ui
+deploy
+.git
